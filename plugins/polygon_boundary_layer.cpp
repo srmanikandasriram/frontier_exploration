@@ -1,5 +1,7 @@
 #include <frontier_exploration/polygon_boundary_layer.h>
 #include <pluginlib/class_list_macros.h>
+//#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <frontier_exploration/tf2_polygon.h>
 
 namespace frontier_exploration
 {

@@ -7,8 +7,7 @@
 #include <geometry_msgs/PolygonStamped.h>
 
 #include <frontier_exploration/ExploreTaskAction.h>
-#include <frontier_exploration/GetNextFrontier.h>
-#include <frontier_exploration/UpdateBoundaryPolygon.h>
+#include <frontier_exploration/SetPolygonBoundary.h>
 
 #include <tf/transform_listener.h>
 
@@ -16,6 +15,7 @@
 
 #include <frontier_exploration/geometry_tools.h>
 #include <frontier_exploration/frontier_search.h>
+#include "../../../../../../../opt/ros/indigo/include/ros/rate.h"
 
 namespace frontier_exploration
 {
@@ -34,22 +34,30 @@ namespace frontier_exploration
     * @param name Name for SimpleActionServer
     */
     ExplorationServer(std::string name) :
-        tf_listener_(ros::Duration(10.0)),
+        nh_(),
         private_nh_("~"),
         as_(nh_, name, boost::bind(&ExplorationServer::executeCb, this, _1), false),
+        tf_listener_(),
         move_client_("move_base", true),
         retry_(5)
     {
       private_nh_.param<double>("frequency", frequency_, 0.0);
       private_nh_.param<double>("goal_aliasing", goal_aliasing_, 0.1);
       as_.registerPreemptCallback(boost::bind(&ExplorationServer::preemptCb, this));
+      as_.registerGoalCallback(boost::bind(&ExplorationServer::goalCb, this));
       as_.start();
+
+      explore_costmap_ros_.reset(new costmap_2d::Costmap2DROS("explore_costmap", tf_listener_));
+
+      setPolygonBoundary = private_nh_.serviceClient<frontier_exploration::SetPolygonBoundary>("explore_costmap/explore_boundary/set_polygon_boundary");
     }
 
   private:
 
     actionlib::SimpleActionServer <frontier_exploration::ExploreTaskAction> as_;
     actionlib::SimpleActionClient <move_base_msgs::MoveBaseAction> move_client_;
+
+    ros::ServiceClient setPolygonBoundary;
 
     ros::NodeHandle nh_;
     ros::NodeHandle private_nh_;
@@ -67,6 +75,27 @@ namespace frontier_exploration
 
     move_base_msgs::MoveBaseGoal move_client_goal_;
 
+
+    void goalCb(){
+      explore_costmap_ros_->resetLayers();
+    }
+
+    /**
+    * @brief Preempt callback for the server, cancels the current running goal and all associated movement actions.
+    */
+    void preemptCb()
+    {
+
+      if (as_.isActive())
+      {
+        as_.setPreempted();
+        ROS_WARN("Current exploration task cancelled");
+        boost::unique_lock <boost::mutex> lock(move_client_lock_);
+        move_client_.cancelGoalsAtAndBeforeTime(ros::Time::now());
+      }
+
+    }
+
     /**
     * @brief Execute callback for actionserver, run after accepting a new goal
     * @param goal ActionGoal containing boundary of area to explore, and a valid centerpoint for the area.
@@ -78,22 +107,10 @@ namespace frontier_exploration
       success_ = false;
       moving_ = false;
 
-      //create exploration costmap and frontier_search
-      if (!explore_costmap_ros_)
-      {
-        explore_costmap_ros_.reset(new costmap_2d::Costmap2DROS("explore_costmap", tf_listener_));
-      }
-      else
-      {
-        explore_costmap_ros_->resetLayers();
-      }
-      frontier_search_.reset(new FrontierSearch(explore_costmap_ros_));
-
-      //create costmap services
-      ros::ServiceClient updateBoundaryPolygon = private_nh_.serviceClient<frontier_exploration::UpdateBoundaryPolygon>("explore_costmap/explore_boundary/update_boundary_polygon");
+//    frontier_search_.reset(new FrontierSearch(explore_costmap_ros_));
 
       //wait for move_base and costmap services
-      if (!move_client_.waitForServer() || !updateBoundaryPolygon.waitForExistence())
+      if (!move_client_.waitForServer() || !setPolygonBoundary.waitForExistence())
       {
         as_.setAborted();
         return;
@@ -103,8 +120,8 @@ namespace frontier_exploration
       if (ros::ok() && as_.isActive())
       {
         frontier_exploration::SetPolygonBoundary srv;
-        srv.request.explore_boundary = goal->explore_boundary;
-        if (updateBoundaryPolygon.call(srv))
+        srv.request.polygon_boundary = goal->explore_boundary;
+        if (setPolygonBoundary.call(srv))
         {
           ROS_INFO("Region boundary set");
         }
@@ -116,10 +133,13 @@ namespace frontier_exploration
         }
       }
 
-//      //loop until all frontiers are explored
-//      ros::Rate rate(frequency_);
-//      while (ros::ok() && as_.isActive())
-//      {
+      //loop until all frontiers are explored
+      ros::Rate rate(frequency_);
+      while (ros::ok() && as_.isActive())
+      {
+        rate.sleep();
+        ROS_INFO("Ping");
+      }
 //
 //        //placeholder for next goal to be sent to move base
 //        geometry_msgs::PoseStamped goal_pose;
@@ -237,26 +257,12 @@ namespace frontier_exploration
 //      }
 
       //goal should never be active at this point
-      ROS_ASSERT(!as_.isActive());
+//      ROS_ASSERT(!as_.isActive());
 
     }
 
 
-    /**
-    * @brief Preempt callback for the server, cancels the current running goal and all associated movement actions.
-    */
-    void preemptCb()
-    {
 
-      if (as_.isActive())
-      {
-        as_.setPreempted();
-        ROS_WARN("Current exploration task cancelled");
-        boost::unique_lock <boost::mutex> lock(move_client_lock_);
-        move_client_.cancelGoalsAtAndBeforeTime(ros::Time::now());
-      }
-
-    }
 
     /**
     * @brief Feedback callback for the move_base client, republishes as feedback for the exploration server
