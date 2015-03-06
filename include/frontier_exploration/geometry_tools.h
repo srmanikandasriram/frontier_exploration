@@ -5,7 +5,8 @@
 #include <geometry_msgs/Point.h>
 #include <costmap_2d/costmap_2d.h>
 
-namespace frontier_exploration{
+namespace frontier_exploration
+{
 
   /**
   * @brief Calculate distance between two points
@@ -14,8 +15,9 @@ namespace frontier_exploration{
   * @return Distance between two points
   */
   template<typename T, typename S>
-  double pointsDistance(T one, S two){
-      return sqrt(pow(one.x-two.x,2.0) + pow(one.y-two.y,2.0) + pow(one.z-two.z,2.0));
+  double pointsDistance(T one, S two)
+  {
+    return sqrt(pow(one.x - two.x, 2.0) + pow(one.y - two.y, 2.0) + pow(one.z - two.z, 2.0));
   }
 
   /**
@@ -23,16 +25,19 @@ namespace frontier_exploration{
   * @param polygon Polygon to process
   * @return Perimeter of polygon
   */
-  double polygonPerimeter(geometry_msgs::Polygon polygon){
-      if(polygon.points.size() <= 1){
-          return 0;
-      }
+  double polygonPerimeter(geometry_msgs::Polygon polygon)
+  {
+    if (polygon.points.size() <= 1)
+    {
+      return 0;
+    }
 
-      double perimeter;
-      for (int i = 0, j = polygon.points.size()-1; i < polygon.points.size(); j = i++) {
-          perimeter += pointsDistance(polygon.points[i], polygon.points[j]);
-      }
-      return perimeter;
+    double perimeter;
+    for (int i = 0, j = polygon.points.size() - 1; i < polygon.points.size(); j = i++)
+    {
+      perimeter += pointsDistance(polygon.points[i], polygon.points[j]);
+    }
+    return perimeter;
   }
 
 /**
@@ -43,8 +48,9 @@ namespace frontier_exploration{
 * @return True if approximately adjacent, false otherwise
 */
   template<typename T, typename S>
-  bool pointsNearby(T one, S two, double proximity){
-      return pointsDistance(one, two) <= proximity;
+  bool pointsNearby(T one, S two, double proximity)
+  {
+    return pointsDistance(one, two) <= proximity;
   }
 
 /**
@@ -54,15 +60,18 @@ namespace frontier_exploration{
 * @return True if point is inside polygon, false otherwise
 */
   template<typename T>
-  bool pointInPolygon(T point, geometry_msgs::Polygon polygon){
-      int cross = 0;
-      for (int i = 0, j = polygon.points.size()-1; i < polygon.points.size(); j = i++) {
-          if ( ((polygon.points[i].y > point.y) != (polygon.points[j].y>point.y)) &&
-              (point.x < (polygon.points[j].x-polygon.points[i].x) * (point.y-polygon.points[i].y) / (polygon.points[j].y-polygon.points[i].y) + polygon.points[i].x) ){
-              cross++;
-          }
+  bool pointInPolygon(T point, geometry_msgs::Polygon polygon)
+  {
+    int cross = 0;
+    for (int i = 0, j = polygon.points.size() - 1; i < polygon.points.size(); j = i++)
+    {
+      if (((polygon.points[i].y > point.y) != (polygon.points[j].y > point.y)) &&
+          (point.x < (polygon.points[j].x - polygon.points[i].x) * (point.y - polygon.points[i].y) / (polygon.points[j].y - polygon.points[i].y) + polygon.points[i].x))
+      {
+        cross++;
       }
-      return bool(cross % 2);
+    }
+    return bool(cross % 2);
   }
 
 /**
@@ -72,19 +81,21 @@ namespace frontier_exploration{
 * @return Yaw angle of vector
 */
   template<typename T, typename S>
-  double yawOfVector(T origin, S end){
+  double yawOfVector(T origin, S end)
+  {
 
-      double delta_x, delta_y;
-      delta_x = end.x - origin.x;
-      delta_y = end.y - origin.y;
+    double delta_x, delta_y;
+    delta_x = end.x - origin.x;
+    delta_y = end.y - origin.y;
 
-      double yaw = atan(delta_x/delta_y);
+    double yaw = atan(delta_x / delta_y);
 
-      if(delta_x < 0){
-          yaw = M_PI-yaw;
-      }
+    if (delta_x < 0)
+    {
+      yaw = M_PI - yaw;
+    }
 
-      return yaw;
+    return yaw;
   }
 
 }
