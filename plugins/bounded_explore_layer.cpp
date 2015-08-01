@@ -80,6 +80,23 @@ namespace frontier_exploration
         return getNextFrontier(req.start_pose, res.next_frontier);
     }
 
+    double BoundedExploreLayer::distance_to_polygon(Frontier frontier){
+        // find two nearest points
+        geometry_msgs::Point32 centroid;
+        int count = 0;
+        BOOST_FOREACH(geometry_msgs::Point32 point32, polygon_.points){
+            centroid.x += point32.x;
+            centroid.y += point32.y;
+            centroid.z += point32.z;
+            count++;
+        }
+        centroid.x /= count;
+        centroid.y /= count;
+        centroid.z /= count;
+
+        return (centroid.x-frontier.initial.x)*(centroid.x-frontier.initial.x)+ (centroid.y-frontier.initial.y)*(centroid.y-frontier.initial.y);
+    }
+
     bool BoundedExploreLayer::getNextFrontier(geometry_msgs::PoseStamped start_pose, geometry_msgs::PoseStamped &next_frontier){
 
         //wait for costmap to get marked with boundary
@@ -117,7 +134,7 @@ namespace frontier_exploration
         pcl::PointCloud<pcl::PointXYZI> frontier_cloud_viz;
         pcl::PointXYZI frontier_point_viz(50);
         int max;
-
+        std::cout << "Polygon is : " << polygon_ << std::endl;
         BOOST_FOREACH(Frontier frontier, frontier_list){
             //load frontier into visualization poitncloud
             frontier_point_viz.x = frontier.initial.x;
@@ -125,10 +142,13 @@ namespace frontier_exploration
             frontier_cloud_viz.push_back(frontier_point_viz);
 
             //check if this frontier is the nearest to robot
-            if (frontier.min_distance < selected.min_distance){
+            double dist_to_polygon = distance_to_polygon(frontier);
+            if (dist_to_polygon < selected.min_distance){
                 selected = frontier;
+                selected.min_distance = dist_to_polygon;
                 max = frontier_cloud_viz.size()-1;
             }
+            std::cout << frontier.initial << " at a distance of " << dist_to_polygon << std::endl;
         }
 
         //color selected frontier
@@ -156,7 +176,8 @@ namespace frontier_exploration
             ROS_ERROR("Invalid 'frontier_travel_point' parameter, falling back to 'closest'");
             next_frontier.pose.position = selected.initial;
         }
-
+        std::cout << "Selected next frontier is " << next_frontier << std::endl;
+        // std::cin.ignore();
         next_frontier.pose.orientation = tf::createQuaternionMsgFromYaw( yawOfVector(start_pose.pose.position, next_frontier.pose.position) );
         return true;
 

@@ -1,7 +1,7 @@
 #include <frontier_exploration/frontier_search.h>
 
 #include <costmap_2d/costmap_2d.h>
-#include<costmap_2d/cost_values.h>
+#include <costmap_2d/cost_values.h>
 #include <geometry_msgs/Point.h>
 #include <boost/foreach.hpp>
 
@@ -65,7 +65,7 @@ std::list<Frontier> FrontierSearch::searchFrom(geometry_msgs::Point position){
             }else if(isNewFrontierCell(nbr, frontier_flag)){
                 frontier_flag[nbr] = true;
                 Frontier new_frontier = buildNewFrontier(nbr, pos, frontier_flag);
-                if(new_frontier.size > 1){
+                if(new_frontier.size > 1 && isNewFrontierCellNearObject(nbr, frontier_flag)){
                     frontier_list.push_back(new_frontier);
                 }
             }
@@ -84,11 +84,6 @@ Frontier FrontierSearch::buildNewFrontier(unsigned int initial_cell, unsigned in
     output.centroid.y = 0;
     output.size = 1;
     output.min_distance = std::numeric_limits<double>::infinity();
-
-    //record initial contact point for frontier
-    unsigned int ix, iy;
-    costmap_.indexToCells(initial_cell,ix,iy);
-    costmap_.mapToWorld(ix,iy,output.initial.x,output.initial.y);
 
     //push initial gridcell onto queue
     std::queue<unsigned int> bfs;
@@ -134,8 +129,16 @@ Frontier FrontierSearch::buildNewFrontier(unsigned int initial_cell, unsigned in
                 //add to queue for breadth first search
                 bfs.push(nbr);
             }
+            if(isNewFrontierCellNearObject(nbr,frontier_flag)){
+                initial_cell = nbr;
+            }
         }
     }
+
+    //record initial contact point for frontier
+    unsigned int ix, iy;
+    costmap_.indexToCells(initial_cell,ix,iy);
+    costmap_.mapToWorld(ix,iy,output.initial.x,output.initial.y);
 
     //average out frontier centroid
     output.centroid.x /= output.size;
@@ -159,6 +162,27 @@ bool FrontierSearch::isNewFrontierCell(unsigned int idx, const std::vector<bool>
 
     return false;
 
+}
+
+bool FrontierSearch::isNewFrontierCellNearObject(unsigned int idx, const std::vector<bool>& frontier_flag){
+
+    //check that cell is unknown and not already marked as frontier
+    if(map_[idx] != NO_INFORMATION){
+        return false;
+    }
+
+    //frontier cells should have at least one cell in 4-connected neighbourhood that is free
+    BOOST_FOREACH(unsigned int nbr, nhood4(idx, costmap_)){
+        if((int)map_[nbr] == 255){
+            unsigned int ix, iy;
+            double x,y;
+            costmap_.indexToCells(nbr,ix,iy);
+            costmap_.mapToWorld(ix,iy,x,y);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 }

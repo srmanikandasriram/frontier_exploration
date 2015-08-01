@@ -44,6 +44,7 @@ protected:
      * @return
      */
     bool isNewFrontierCell(unsigned int idx, const std::vector<bool>& frontier_flag);
+    bool isNewFrontierCellNearObject(unsigned int idx, const std::vector<bool>& frontier_flag);
 
 private:
 

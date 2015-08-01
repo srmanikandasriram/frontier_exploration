@@ -98,6 +98,8 @@ private:
 
     void reconfigureCB(costmap_2d::GenericPluginConfig &config, uint32_t level);
 
+    double distance_to_polygon(Frontier frontier);
+    
     dynamic_reconfigure::Server<costmap_2d::GenericPluginConfig> *dsrv_;
     ros::ServiceServer polygonService_;
     ros::ServiceServer frontierService_;
